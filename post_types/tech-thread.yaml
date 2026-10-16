@@ -1,0 +1,10 @@
+id: tech-thread
+prompt_path: prompts/tech-thread.md
+structure: thread
+min_tweets: 5
+max_tweets: 10
+criteria:
+  - explain_mechanism
+  - map_claims_to_evidence
+  - include_mitigation
+  - preserve_thread_order

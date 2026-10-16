@@ -1,0 +1,9 @@
+id: marketing
+prompt_path: prompts/marketing.md
+structure: single
+min_tweets: 1
+max_tweets: 1
+criteria:
+  - factual_and_grounded
+  - useful_security_takeaway
+  - restrained_cta

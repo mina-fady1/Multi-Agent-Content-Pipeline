@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.1",
+  "provider": "gemini",
+  "currency": "USD",
+  "unit": "per_million_tokens",
+  "models": {
+    "gemini-3.8-flash": {
+      "input": null,
+      "output": null,
+      "cached_input": null,
+      "thoughts": null,
+      "tool": null
+    }
+  },
+  "notes": "Gemini rates are intentionally unset in this offline sample. Add reviewed USD rates for the exact model and token categories before relying on live cost estimates. Keep unavailable categories null."
+}

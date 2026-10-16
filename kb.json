@@ -1,0 +1,309 @@
+[
+  {
+    "id": "kb_reentrancy",
+    "name": "Reentrancy",
+    "severity": "high",
+    "category": "control-flow",
+    "description": "An external call can re-enter a function before its state effects are committed, allowing repeated withdrawals or inconsistent accounting.",
+    "root_cause": "Interaction with untrusted code occurs before checks and state updates, or a shared lock is missing.",
+    "aliases": ["reentrant call", "cross-function reentrancy", "SWC-107"],
+    "evidence_points": [
+      "A fallback or receive function can call back into the target contract during an external call.",
+      "Checks-effects-interactions places validation first, state effects second, and external calls last.",
+      "A reentrancy guard can serialize entry across functions that share the same invariant.",
+      "Pull-payment designs reduce the amount of trusted code executed during a withdrawal.",
+      "Read-only reentrancy can expose transient state to a view used by another protocol."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-107/", "https://docs.soliditylang.org/en/latest/security-considerations.html#reentrancy"]
+  },
+  {
+    "id": "kb_access_control",
+    "name": "Broken access control",
+    "severity": "critical",
+    "category": "authorization",
+    "description": "A privileged operation is callable by an unintended account or role, enabling unauthorized minting, withdrawals, upgrades, or configuration changes.",
+    "root_cause": "Missing, incorrect, or bypassable authorization checks on state-changing entry points.",
+    "aliases": ["unprotected admin function", "privilege escalation", "SWC-105"],
+    "evidence_points": [
+      "Every privileged function should enforce the intended caller or role at the contract boundary.",
+      "An ownership transfer must validate the new owner and avoid leaving an unusable zero address.",
+      "Role administration should be explicit; a role that grants itself can become a privilege-escalation path.",
+      "Initialization functions need one-time protection in upgradeable deployments.",
+      "Tests should exercise unauthorized callers as well as the expected administrator."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-105/", "https://docs.openzeppelin.com/contracts/5.x/access-control"]
+  },
+  {
+    "id": "kb_delegatecall",
+    "name": "Unsafe delegatecall",
+    "severity": "critical",
+    "category": "arbitrary-code-execution",
+    "description": "delegatecall executes another contract's code with the caller's storage, balance, and address context; an untrusted target can overwrite critical state.",
+    "root_cause": "Implementation or target addresses are user-controlled, insufficiently validated, or storage layouts are incompatible.",
+    "aliases": ["delegatecall injection", "untrusted delegatecall", "SWC-112"],
+    "evidence_points": [
+      "delegatecall preserves msg.sender and writes to the caller's storage slots.",
+      "A user-controlled implementation address can execute arbitrary logic in the caller context.",
+      "Proxy implementations need an upgrade authorization boundary and compatibility checks.",
+      "Storage slot collisions can corrupt ownership or balances even when the target is trusted.",
+      "Use static allowlists or audited proxy patterns instead of forwarding arbitrary calldata."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-112/", "https://docs.soliditylang.org/en/latest/introduction-to-smart-contracts.html#delegatecall-and-libraries"]
+  },
+  {
+    "id": "kb_oracle_manipulation",
+    "name": "Oracle and price manipulation",
+    "severity": "high",
+    "category": "oracle",
+    "description": "A protocol trusts a manipulable spot price or stale feed, allowing an attacker to borrow, liquidate, or exchange at an incorrect valuation.",
+    "root_cause": "Insufficient liquidity, a single-block price source, missing freshness checks, or incorrect feed decimal handling.",
+    "aliases": ["oracle manipulation", "spot-price attack", "stale oracle", "flash-loan price manipulation"],
+    "evidence_points": [
+      "A low-liquidity pool's instantaneous reserve ratio can be moved within one transaction.",
+      "Time-weighted prices make a manipulation more expensive but do not remove all oracle risk.",
+      "Consumers should check the feed round and updated timestamp before using a value.",
+      "Feed decimals must be normalized before comparing assets with different units.",
+      "A circuit breaker or bounded deviation can limit damage when a feed is unavailable or abnormal."
+    ],
+    "references": ["https://docs.chain.link/data-feeds/price-feeds", "https://docs.uniswap.org/contracts/v2/concepts/core-concepts/oracles"]
+  },
+  {
+    "id": "kb_tx_origin",
+    "name": "tx.origin authorization",
+    "severity": "high",
+    "category": "authorization",
+    "description": "Using tx.origin for authorization lets a malicious intermediary contract trick a user into triggering a privileged action.",
+    "root_cause": "Authorization compares the entire transaction's originator instead of the immediate caller.",
+    "aliases": ["tx.origin phishing", "SWC-115"],
+    "evidence_points": [
+      "tx.origin is the externally owned account that started the transaction, not the immediate caller.",
+      "A phishing contract can call a victim contract while preserving the user's tx.origin.",
+      "msg.sender identifies the immediate caller and is the usual primitive for access checks.",
+      "Meta-transaction systems need an explicit trusted forwarder model rather than tx.origin.",
+      "Solidity security guidance recommends never using tx.origin for authorization."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-115/", "https://docs.soliditylang.org/en/latest/security-considerations.html#tx-origin"]
+  },
+  {
+    "id": "kb_unchecked_call",
+    "name": "Unchecked low-level call result",
+    "severity": "medium",
+    "category": "error-handling",
+    "description": "Ignoring the boolean result of call, send, or delegatecall can make a contract continue after an external operation failed.",
+    "root_cause": "Low-level calls return success data instead of automatically reverting, and the result is not checked.",
+    "aliases": ["unchecked call", "ignored return value", "SWC-104"],
+    "evidence_points": [
+      "address.call returns a success flag and returned bytes; it does not throw for every failure.",
+      "A failed payment followed by a state update can create insolvency or accounting drift.",
+      "Using a checked wrapper such as SafeERC20 makes non-standard token failures explicit.",
+      "If failure is acceptable, the code should record and handle it deliberately.",
+      "Tests should cover both revert and false-returning callee behavior."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-104/", "https://docs.soliditylang.org/en/latest/control-structures.html#external-function-calls"]
+  },
+  {
+    "id": "kb_timestamp_dependence",
+    "name": "Block timestamp dependence",
+    "severity": "medium",
+    "category": "blockchain-environment",
+    "description": "Contract logic treats block.timestamp as an exact clock or random value even though block producers have limited influence over it.",
+    "root_cause": "Time-sensitive or entropy-sensitive decisions rely on a miner/validator-controlled timestamp without tolerance.",
+    "aliases": ["timestamp manipulation", "SWC-116"],
+    "evidence_points": [
+      "block.timestamp is useful for coarse expiries but should not be treated as exact wall-clock time.",
+      "A producer may adjust a timestamp within consensus validity bounds.",
+      "Short windows and boundary conditions can make timestamp influence economically relevant.",
+      "Use block numbers or an oracle when the application needs a different time model.",
+      "Avoid using timestamp alone as a source of unpredictable randomness."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-116/", "https://docs.soliditylang.org/en/latest/units-and-global-variables.html#block-and-transaction-properties"]
+  },
+  {
+    "id": "kb_weak_randomness",
+    "name": "Weak on-chain randomness",
+    "severity": "high",
+    "category": "randomness",
+    "description": "Values derived from public block data or predictable state can be anticipated or biased by users and block producers.",
+    "root_cause": "Unpredictable outcomes use blockhash, timestamp, sender, or similar public inputs without a commit-reveal or oracle.",
+    "aliases": ["predictable randomness", "blockhash randomness", "SWC-120"],
+    "evidence_points": [
+      "Block timestamps and hashes are visible to participants and are not secret randomness.",
+      "The blockhash for the current block is unavailable during execution and recent hashes have limited history.",
+      "Commit-reveal separates choosing a secret from revealing it and can reduce last-mover bias.",
+      "A verifiable randomness service supplies a proof that consumers can verify on-chain.",
+      "Randomness designs need an explicit response to non-reveal and liveness griefing."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-120/", "https://docs.chain.link/vrf"]
+  },
+  {
+    "id": "kb_signature_replay",
+    "name": "Signature replay",
+    "severity": "high",
+    "category": "cryptography",
+    "description": "A valid signed message can be reused in another context, chain, contract, or time because the signed domain lacks replay protection.",
+    "root_cause": "Messages omit a nonce, chain identifier, verifying contract, expiry, or consume-once state.",
+    "aliases": ["replayed permit", "cross-chain replay", "SWC-121"],
+    "evidence_points": [
+      "A per-signer nonce makes each authorization single-use when the contract consumes it.",
+      "EIP-712 domain separation binds typed data to a chain and verifying contract.",
+      "Chain IDs can change or fork, so domain handling must follow the chosen signing standard.",
+      "Deadlines bound how long an off-chain signature remains valid.",
+      "A signature check proves authorization of the message, not that the requested state is still safe."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-121/", "https://eips.ethereum.org/EIPS/eip-712", "https://eips.ethereum.org/EIPS/eip-2612"]
+  },
+  {
+    "id": "kb_governance_capture",
+    "name": "Governance capture",
+    "severity": "high",
+    "category": "governance",
+    "description": "Voting power can be temporarily borrowed, concentrated, or exercised without enough delay or quorum to pass harmful proposals.",
+    "root_cause": "Voting snapshots, delegation, quorum, timelocks, or proposer protections do not match the threat model.",
+    "aliases": ["flash-loan governance", "vote capture", "proposal takeover"],
+    "evidence_points": [
+      "Current-balance voting lets tokens acquired immediately before a vote influence that vote.",
+      "Snapshot voting records voting power at a defined block or proposal checkpoint.",
+      "A quorum requirement prevents a tiny turnout from controlling a large treasury.",
+      "Timelocks give users time to exit or guardians time to cancel a malicious action.",
+      "Delegation and vote counting must avoid double counting and handle token transfers consistently."
+    ],
+    "references": ["https://docs.openzeppelin.com/contracts/5.x/governance", "https://docs.openzeppelin.com/contracts/5.x/api/governance"]
+  },
+  {
+    "id": "kb_dos_unbounded_loop",
+    "name": "Denial of service from unbounded work",
+    "severity": "high",
+    "category": "availability",
+    "description": "A loop or batch operation grows with user-controlled state until it exceeds the block gas limit or becomes impractical to execute.",
+    "root_cause": "On-chain work scales linearly with an unbounded array, list, or number of recipients.",
+    "aliases": ["gas-limit DoS", "unbounded loop", "SWC-128"],
+    "evidence_points": [
+      "Block gas limits bound how much computation a transaction can perform.",
+      "An attacker can sometimes add entries that force a later loop to exceed the limit.",
+      "Pagination lets callers process bounded ranges across multiple transactions.",
+      "Pull-based claims avoid one transaction iterating over every recipient.",
+      "Gas measurements should include worst-case state size, not only a small fixture."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-128/", "https://docs.soliditylang.org/en/latest/security-considerations.html#gas-limit-and-loops"]
+  },
+  {
+    "id": "kb_dos_failed_call",
+    "name": "Denial of service by failed external call",
+    "severity": "medium",
+    "category": "availability",
+    "description": "A loop or state transition reverts when one recipient rejects a call, blocking unrelated users or all progress.",
+    "root_cause": "The design requires every external payment or callback to succeed before state can advance.",
+    "aliases": ["DoS with unexpected revert", "push-payment DoS", "SWC-113"],
+    "evidence_points": [
+      "A recipient contract can deliberately revert in its fallback or receive function.",
+      "Pushing funds to many recipients couples their liveness to one transaction.",
+      "Pull payments let each recipient withdraw independently and handle its own failure.",
+      "Skipping a failed recipient must preserve accounting and provide a retry path.",
+      "External callbacks should be treated as untrusted and bounded in both gas and effects."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-113/", "https://docs.openzeppelin.com/contracts/4.x/api/security#PullPayment"]
+  },
+  {
+    "id": "kb_proxy_upgrade_auth",
+    "name": "Unprotected proxy upgrade",
+    "severity": "critical",
+    "category": "upgradeability",
+    "description": "An unauthorized account can change a proxy implementation or initializer, replacing trusted behavior with malicious code.",
+    "root_cause": "Upgrade authorization is missing, incorrectly wired, or the implementation can be initialized by anyone.",
+    "aliases": ["proxy upgrade authorization", "proxy takeover", "UUPS authorization", "implementation hijack"],
+    "evidence_points": [
+      "The proxy address stays constant while calls execute code at the implementation address.",
+      "UUPS implementations must override _authorizeUpgrade with an access restriction.",
+      "An upgrade admin should be separated from ordinary user calls according to the proxy pattern.",
+      "Initializer functions need one-time guards because constructors do not run in proxy storage.",
+      "Upgrade reviews should check storage layout compatibility and the new implementation's permissions."
+    ],
+    "references": ["https://docs.openzeppelin.com/contracts/5.x/api/proxy", "https://docs.openzeppelin.com/upgrades-plugins/proxies"]
+  },
+  {
+    "id": "kb_token_transfer_assumptions",
+    "name": "Unsafe token transfer assumptions",
+    "severity": "medium",
+    "category": "token-integration",
+    "description": "A contract assumes every ERC-20 transfer returns true or transfers the requested amount, which is false for some tokens and fee-on-transfer designs.",
+    "root_cause": "Integration relies on optional return data or nominal amounts without checking actual balance changes.",
+    "aliases": ["non-standard ERC20", "fee-on-transfer mismatch", "silent token failure"],
+    "evidence_points": [
+      "The original ERC-20 ecosystem includes tokens that return no boolean value from transfer.",
+      "SafeERC20 treats no return data as success and decodes an explicit false as failure.",
+      "Fee-on-transfer tokens may deliver less than the amount requested.",
+      "Accounting should use the actual received amount where token behavior permits it.",
+      "Approval updates can have race considerations; increase/decrease patterns are safer for some tokens."
+    ],
+    "references": ["https://eips.ethereum.org/EIPS/eip-20", "https://docs.openzeppelin.com/contracts/5.x/api/token/erc20#SafeERC20"]
+  },
+  {
+    "id": "kb_rounding_precision",
+    "name": "Rounding and precision errors",
+    "severity": "medium",
+    "category": "arithmetic",
+    "description": "Integer division truncates values and repeated conversions can accumulate a favorable bias that drains or misprices a system.",
+    "root_cause": "The order of multiplication and division, scale factors, or rounding direction is not specified for each invariant.",
+    "aliases": ["dust leakage", "fixed-point truncation", "share-price rounding"],
+    "evidence_points": [
+      "Solidity integer division truncates toward zero and discards a remainder.",
+      "Multiplying before dividing preserves precision when the intermediate value cannot overflow.",
+      "Rounding direction should favor the protocol or user according to the invariant.",
+      "Decimals are metadata; token arithmetic still uses integer base units.",
+      "Property tests should cover tiny deposits, withdrawals, and values near conversion boundaries."
+    ],
+    "references": ["https://docs.soliditylang.org/en/latest/types.html#division", "https://github.com/ethereum/solidity/blob/develop/docs/control-structures.rst"]
+  },
+  {
+    "id": "kb_frontrunning_ordering",
+    "name": "Frontrunning and transaction-order dependence",
+    "severity": "medium",
+    "category": "transaction-ordering",
+    "description": "A pending transaction reveals a price, order, or action that another participant can observe and execute first, changing its outcome.",
+    "root_cause": "Sensitive operations are public before settlement and have no slippage bound, commit-reveal, or deadline.",
+    "aliases": ["sandwich attack", "MEV", "SWC-114"],
+    "evidence_points": [
+      "Pending transactions may be observed before inclusion and reordered by block builders.",
+      "A minimum-output or maximum-input bound limits unexpected execution price movement.",
+      "Deadlines prevent stale orders from being executed much later than intended.",
+      "Commit-reveal hides order details until a later reveal transaction.",
+      "Private order flow changes visibility but does not replace contract-level slippage checks."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-114/", "https://ethereum.org/en/developers/docs/mev/"]
+  },
+  {
+    "id": "kb_pre08_arithmetic",
+    "name": "Arithmetic overflow in pre-0.8 Solidity",
+    "severity": "high",
+    "category": "arithmetic",
+    "description": "For Solidity versions before 0.8.0, arithmetic on uint and int wraps silently unless guarded by a checked library or explicit bounds.",
+    "root_cause": "Legacy compiler semantics allow values to wrap at the type modulus.",
+    "aliases": ["integer overflow", "integer underflow", "SWC-101"],
+    "evidence_points": [
+      "Solidity 0.8.0 and later revert on overflow and underflow in ordinary arithmetic.",
+      "Unchecked blocks in modern Solidity intentionally restore wrapping behavior for selected operations.",
+      "Legacy contracts may use SafeMath to add checks where the compiler does not provide them.",
+      "Casting to a smaller integer type can still truncate or revert depending on the operation and version.",
+      "Audit conclusions must record the compiler version and enabled optimizer/settings."
+    ],
+    "references": ["https://swcregistry.io/docs/SWC-101/", "https://docs.soliditylang.org/en/latest/080-breaking-changes.html"]
+  },
+  {
+    "id": "kb_storage_collision",
+    "name": "Proxy storage collision",
+    "severity": "high",
+    "category": "upgradeability",
+    "description": "Proxy and implementation variables map to the same storage slots, so an upgrade or delegatecall writes one value over another.",
+    "root_cause": "Incompatible storage layout, manual slot mistakes, or an unstructured proxy that does not reserve implementation/admin slots.",
+    "aliases": ["storage layout corruption", "slot collision", "proxy variable collision"],
+    "evidence_points": [
+      "delegatecall uses the proxy's storage, so implementation variable ordering matters.",
+      "Adding variables in the middle of an upgradeable contract can shift later slots.",
+      "Append-only storage layout is the usual compatibility rule for upgrades.",
+      "Namespaced or standardized slots reduce collisions for proxy metadata.",
+      "Upgrade tooling can compare layouts before deployment, but custom assembly still needs review."
+    ],
+    "references": ["https://docs.openzeppelin.com/upgrades-plugins/proxies#unstructured-storage-proxies", "https://eips.ethereum.org/EIPS/eip-1967"]
+  }
+]
+

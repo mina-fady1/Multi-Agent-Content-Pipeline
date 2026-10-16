@@ -1,0 +1,15 @@
+.env
+.venv/
+.bootstrap/
+.testdeps/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+output/*
+!output/sample-week/
+
